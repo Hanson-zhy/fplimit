@@ -51,6 +51,9 @@ dependencies {
     // Xposed API 82（编译期 stub，运行时由 LSPosed 提供）。直接内置 jar，避免依赖已失效的仓库。
     compileOnly(files("libs/xposed-api-82.jar"))
 
+    // YukiHookAPI 生成代码里用到了 androidx.annotation.Keep
+    compileOnly("androidx.annotation:annotation:1.9.1")
+
     implementation("com.highcapable.yukihookapi:api:1.3.1")
     ksp("com.highcapable.yukihookapi:ksp-xposed:1.3.1")
 }
