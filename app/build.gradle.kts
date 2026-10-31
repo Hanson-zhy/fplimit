@@ -52,7 +52,7 @@ dependencies {
     compileOnly(files("libs/xposed-api-82.jar"))
 
     // YukiHookAPI 生成代码里用到了 androidx.annotation.Keep
-    compileOnly("androidx.annotation:annotation:1.9.1")
+    compileOnly("androidx.annotation:annotation:1.8.1")
 
     implementation("com.highcapable.yukihookapi:api:1.3.1")
     ksp("com.highcapable.yukihookapi:ksp-xposed:1.3.1")
