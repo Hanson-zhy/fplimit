@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">指纹上限解锁</string>
+    <string name="xposed_desc">解除 ColorOS 指纹数量上限（设置界面 + system_server 双重放行），允许录入第 6 枚及以上指纹。</string>
+</resources>
