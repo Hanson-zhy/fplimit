@@ -35,6 +35,11 @@ android {
         jvmTarget = "17"
     }
 
+    buildFeatures {
+        // YukiHookAPI 的 KSP 处理器需要读取 BuildConfig 里的包名来生成 xposed_init
+        buildConfig = true
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
