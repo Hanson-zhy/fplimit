@@ -20,7 +20,23 @@
 3. 重启手机（system_server 需要重启才能生效）。
 4. 设置 → 指纹：按钮应保持可用，尝试录入第 6 枚。
 
-若按钮可用但录入仍失败，日志会显示 HAL 返回的错误码 —— 那才是硬件/TEE 的真实上限。
+## 实测结论（2026-11-01，一加 Ace 5 竞速版 / PLF110_16.0.10.501 / Goodix 光学 UFF）
+
+模块生效后，UI 与 system_server 两道软件闸门都被放行（按钮可用、录入可以真正开始），
+但录入到最后一帧时 **TEE（Trustonic TA）拒绝保存模板**：
+
+```
+I/[FP_HAL][IFingerprintCore] [enrollImage] cmd.result.remaining =0, fid = 1904359103
+E/[FP_HAL][TrustonicCa]     [sendCommand] ta send value.b = 259
+E/[FP_HAL][IFingerprintCore] enrollSaveTemplate:256: result:259
+E/[FP_HAL][IFingerprintCore] [enrollSaveTemplate] exit. errno=259
+I/[FP_HAL][OpticalCore]      [doTouchDownEvent] not woking mode
+```
+
+即：**5 枚上限不是软件限制，而是 TA 里写死的模板槽位数**（采集阶段的 rem 能从 9 数到 0，
+说明算法层面接受第 6 枚，但落盘时 TA 返回 259，模板最终没有写入，`dumpsys fingerprint` 仍是 `count:5`）。
+
+所以本模块能做到「把门打开」，但挡在最后一步的是 TEE，无法从 Android 侧绕过。
 
 ## 日志
 
