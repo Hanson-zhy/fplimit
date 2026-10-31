@@ -1,40 +1,89 @@
 package com.hanson.fplimit.hooks
 
-import android.util.Log
 import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
 import com.highcapable.yukihookapi.hook.factory.method
+import com.highcapable.yukihookapi.hook.type.java.IntType
 import com.hanson.fplimit.util.callOrNull
+import com.hanson.fplimit.util.callStaticOrNull
 import com.hanson.fplimit.util.fieldOrNull
+import com.hanson.fplimit.util.logInfo
+import com.hanson.fplimit.util.logWarn
 
-private const val TAG = "FPLimit"
+/**
+ * 想放行到的指纹数量上限。
+ * 原始值来自 com.android.internal.R.integer.config_fingerprintMaxTemplatesPerUser，本机 = 5。
+ */
+private const val TARGET_MAX = 20
 
 /**
  * UI 层：com.android.settings
  *
- * ColorOS 的指纹设置页里，"添加指纹" 按钮的可用性完全由
+ * ColorOS 指纹设置页的「添加指纹」可用性由
  * OplusFingerprintSettings$FingerprintSettingsFragment#updateAddPreference() 决定：
  *
  *   max   = resources.getInteger(config_fingerprintMaxTemplatesPerUser)   // 本机 = 5
  *   count = FingerprintUtils.getFingersCount()
  *   enabled = count < max
- *   summary = count >= max ? "最多可添加 N 个指纹" : ""
+ *   summary = count >= max ? "您最多可以添加 N 个指纹" : ""
  *
- * 我们在该方法执行之后再兜一次：强制 setEnabled(true) 并清空提示文案。
+ * 两道保险：
+ *  1. 直接把该资源 id 的 getInteger 结果改成 TARGET_MAX（从源头放宽）；
+ *  2. updateAddPreference 执行后再强制 setEnabled(true) + 清空提示。
  */
 class SettingsHook : YukiBaseHooker() {
 
     override fun onHook() = loadApp(name = "com.android.settings") {
+        logInfo("settings: module loaded, installing hooks")
+        try {
+            hookMaxTemplates()
+        } catch (t: Throwable) {
+            logWarn("settings: hookMaxTemplates failed: ${t.javaClass.simpleName}: ${t.message}")
+        }
+        try {
+            hookFragment()
+        } catch (t: Throwable) {
+            logWarn("settings: hookFragment failed: ${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+
+    /** 放宽 config_fingerprintMaxTemplatesPerUser 的取值 */
+    private fun hookMaxTemplates() {
+        val resLoad = "com.oplus.settings.internal.SettingsInternalResLoad".toClassOrNull()
+        if (resLoad == null) {
+            logWarn("settings: SettingsInternalResLoad not found")
+            return
+        }
+        val key = "com.android.internal.R.integer.config_fingerprintMaxTemplatesPerUser"
+        val id = resLoad.callStaticOrNull("getInternalResId", key) as? Int
+        if (id == null || id <= 0) {
+            logWarn("settings: cannot resolve $key")
+            return
+        }
+        logInfo("settings: maxTemplates resId=$id -> override to $TARGET_MAX")
+        "android.content.res.Resources".toClass().apply {
+            method {
+                name = "getInteger"
+                param(IntType)
+            }.hook {
+                before {
+                    if (args[0] == id) result = TARGET_MAX
+                }
+            }
+        }
+    }
+
+    /** 兜底：强制「添加指纹」可用 */
+    private fun hookFragment() {
         val className =
             "com.oplus.settings.feature.fingerprint.OplusFingerprintSettings\$FingerprintSettingsFragment"
         val fragment = className.toClassOrNull()
         if (fragment == null) {
-            Log.w(TAG, "settings: $className not found, skip")
-            return@loadApp
+            logWarn("settings: $className not found")
+            return
         }
-        Log.i(TAG, "settings: hooking $className")
+        logInfo("settings: hooking $className")
 
         fragment.apply {
-            // 每次刷新指纹列表都会走到这里（handleMessage -> updateAddPreference）
             method {
                 name = "updateAddPreference"
                 emptyParam()
@@ -43,8 +92,6 @@ class SettingsHook : YukiBaseHooker() {
                     instance.forceEnableAdd()
                 }
             }
-
-            // 进入页面时再补一次，避免列表刷新时机早于 fragment 初始化
             method {
                 name = "onResume"
                 emptyParam()
@@ -63,10 +110,10 @@ private fun Any?.forceEnableAdd() {
     val pref = fieldOrNull("mAddFingerPreference")
         ?: callOrNull("findPreference", "key_fingerprint_add")
     if (pref == null) {
-        Log.w(TAG, "settings: add-fingerprint preference not found")
+        logWarn("settings: add-fingerprint preference not found")
         return
     }
     pref.callOrNull("setEnabled", true)
     pref.callOrNull("setSummary", "")
-    Log.i(TAG, "settings: add-fingerprint button forced enabled")
+    logInfo("settings: add-fingerprint button forced enabled")
 }

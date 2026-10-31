@@ -1,8 +1,19 @@
 package com.hanson.fplimit.util
 
 import android.util.Log
+import com.highcapable.yukihookapi.hook.log.YLog
 
 private const val TAG = "FPLimit"
+
+fun logInfo(msg: String) {
+    Log.i(TAG, msg)
+    runCatching { YLog.info(msg) }
+}
+
+fun logWarn(msg: String) {
+    Log.w(TAG, msg)
+    runCatching { YLog.warn(msg) }
+}
 
 /**
  * 反射工具：按名字找字段（含父类链），找不到返回 null，绝不抛异常。
@@ -19,7 +30,7 @@ fun Any?.fieldOrNull(name: String): Any? {
         } catch (_: NoSuchFieldException) {
             c = c.superclass
         } catch (t: Throwable) {
-            Log.w(TAG, "fieldOrNull($name) failed: ${t.javaClass.simpleName}: ${t.message}")
+            logWarn("fieldOrNull($name) failed: ${t.javaClass.simpleName}: ${t.message}")
             return null
         }
     }
@@ -39,12 +50,25 @@ fun Any?.callOrNull(name: String, vararg args: Any?): Any? {
                 m.isAccessible = true
                 m.invoke(target, *args)
             } catch (t: Throwable) {
-                Log.w(TAG, "callOrNull($name) failed: ${t.javaClass.simpleName}: ${t.message}")
+                logWarn("callOrNull($name) failed: ${t.javaClass.simpleName}: ${t.message}")
                 null
             }
         }
         c = c.superclass
     }
-    Log.w(TAG, "callOrNull($name) not found")
+    logWarn("callOrNull($name) not found")
     return null
+}
+
+fun Class<*>?.callStaticOrNull(name: String, vararg args: Any?): Any? {
+    val target = this ?: return null
+    val m = target.declaredMethods.firstOrNull { it.name == name && it.parameterCount == args.size }
+        ?: return null
+    return try {
+        m.isAccessible = true
+        m.invoke(null, *args)
+    } catch (t: Throwable) {
+        logWarn("callStaticOrNull($name) failed: ${t.javaClass.simpleName}: ${t.message}")
+        null
+    }
 }
